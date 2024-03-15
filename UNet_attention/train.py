@@ -11,7 +11,7 @@ from torch.utils.data import Dataset, DataLoader
 import torch.optim as optim
 from sklearn.model_selection import train_test_split
 
-EPISODE_DIR = "/projectnb/ds598xz/students/xthomas/FINAL/lux-AI/full_episodes"
+EPISODE_DIR = "/projectnb/ds598xz/students/xthomas/FINAL/sp2024_RL/full_episodes/top_agents/23692494"
 MODEL_DIR = "/projectnb/ds598xz/students/xthomas/FINAL/lux-AI/models/UNet_Attention"
 
 
@@ -66,11 +66,15 @@ def create_dataset_from_json(episode_dir, team_name="Toad Brigade"):
     samples = []
     append = samples.append
 
+    # get all .json files under the episode_dir even in subdirectories
+    episodes = list(Path(episode_dir).rglob("*.json"))
+    # clean episode files
     episodes = [
-        path for path in Path(episode_dir).glob("*.json") if "output" not in path.name
+        str(ep) for ep in episodes if "info" not in str(ep) and "output" not in str(ep)
     ]
-    # episodes = episodes[-1500:]
-    # random.shuffle(episodes)
+
+    episodes = episodes[-1500:]
+    random.shuffle(episodes)
 
     for filepath in tqdm(episodes):
         with open(filepath) as f:
