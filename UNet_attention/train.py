@@ -12,7 +12,7 @@ import torch.optim as optim
 from sklearn.model_selection import train_test_split
 
 EPISODE_DIR = "/projectnb/ds598xz/students/xthomas/FINAL/sp2024_RL/full_episodes/top_agents/23692494"
-MODEL_DIR = "/projectnb/ds598xz/students/xthomas/FINAL/lux-AI/models/UNet_Attention"
+MODEL_DIR = "/projectnb/ds598xz/students/xthomas/FINAL/sp2024_RL/models/UNet_Attention"
 
 
 def seed_everything(seed_value):
@@ -309,7 +309,7 @@ def train_model(model, dataloaders_dict, criterion, optimizer, num_epochs):
             traced = torch.jit.trace(
                 model.cpu(), (torch.rand(1, 14, 32, 32), torch.rand(1, 15, 4, 4))
             )
-            traced.save(f"{MODEL_DIR}/model_full_at205.pth")
+            traced.save(f"{MODEL_DIR}/model_23692494.pth")
             best_acc = epoch_acc
 
 
@@ -333,7 +333,7 @@ optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
 scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.98)
 best_acc = 0.0
 global_epoch = 0
-for n in range(40):
+for n in range(100):
     print("Learning with lr :", optimizer.state_dict()["param_groups"][0]["lr"])
     train_model(model, dataloaders_dict, criterion, optimizer, num_epochs=1)
     # We set the LR decayed every epoch
