@@ -11,8 +11,12 @@ from torch.utils.data import Dataset, DataLoader
 import torch.optim as optim
 from sklearn.model_selection import train_test_split
 
-EPISODE_DIR = "/projectnb/ds598xz/students/xthomas/FINAL/lux-AI/full_episodes"
-MODEL_DIR = "/projectnb/ds598xz/students/xthomas/FINAL/lux-AI/models/UNet_4directions"
+EPISODE_DIR = (
+    "/projectnb/ds598xz/students/xthomas/FINAL/sp2024_RL/full_episodes/top_agents"
+)
+MODEL_DIR = (
+    "/projectnb/ds598xz/students/xthomas/FINAL/sp2024_RL/models/UNet_4directions"
+)
 
 
 def seed_everything(seed_value):
@@ -68,12 +72,15 @@ def create_dataset_from_json(episode_dir, team_name="Toad Brigade"):
     samples = []
     append = samples.append
 
+    # get all .json files under the episode_dir even in subdirectories
+    episodes = list(Path(episode_dir).rglob("*.json"))
+    # clean episode files
     episodes = [
-        path for path in Path(episode_dir).glob("*.json") if "output" not in path.name
+        str(ep) for ep in episodes if "info" not in str(ep) and "output" not in str(ep)
     ]
 
-    # if you want to use a small dataset, you can use the code at the next line
-    # episodes = episodes[-500:]
+    # episodes = episodes[-1500:]
+    # random.shuffle(episodes)
 
     for filepath in tqdm(episodes):
         with open(filepath) as f:
@@ -104,47 +111,22 @@ def create_dataset_from_json(episode_dir, team_name="Toad Brigade"):
                 obs_id = f"{ep_id}_{i}"
                 obses[obs_id] = obs
 
-                # action_map for FOUR directions
-                action_map_n = np.zeros((32, 32)) - 1
-                action_map_w = np.zeros((32, 32)) - 1
-                action_map_s = np.zeros((32, 32)) - 1
-                action_map_e = np.zeros((32, 32)) - 1
+                # By initializing the map with -1, we can ignore positions where there is no friend worker
+                action_map = np.zeros((32, 32)) - 1
 
                 for action in actions:
                     unit_id, label, unit_pos = to_label(action, obs)
-                    if label == 0:  # north
-                        action_map_n[unit_pos[1], unit_pos[0]] = 0
-                    elif label == 1:  # west
-                        action_map_e[unit_pos[1], unit_pos[0]] = 0
-                    elif label == 2:  # south
-                        action_map_s[unit_pos[1], unit_pos[0]] = 0
-                    elif label == 3:  # east
-                        action_map_w[unit_pos[1], unit_pos[0]] = 0
-                    elif label == 4:  # build_city
-                        action_map_n[unit_pos[1], unit_pos[0]] = 1
-                        action_map_w[unit_pos[1], unit_pos[0]] = 1
-                        action_map_s[unit_pos[1], unit_pos[0]] = 1
-                        action_map_e[unit_pos[1], unit_pos[0]] = 1
-                    elif label == 5:  # transfer(or CENTER)
-                        action_map_n[unit_pos[1], unit_pos[0]] = 2
-                        action_map_w[unit_pos[1], unit_pos[0]] = 2
-                        action_map_s[unit_pos[1], unit_pos[0]] = 2
-                        action_map_e[unit_pos[1], unit_pos[0]] = 2
-                # we only take the training data with workers' actions
-                if np.any(action_map_n + 1):
-                    # the 3rd number:0,1,2,3 means the time we should rotate our map
-                    append((obs_id, action_map_n, 0))
-                if np.any(action_map_w + 1):
-                    append((obs_id, action_map_w, 1))
-                if np.any(action_map_s + 1):
-                    append((obs_id, action_map_s, 2))
-                if np.any(action_map_s + 1):
-                    append((obs_id, action_map_e, 3))
+                    if label is not None:
+
+                        action_map[unit_pos[0], unit_pos[1]] = label
+
+                append((obs_id, action_map))
 
     return obses, samples
 
 
-episode_dir = "../UNet/full_episodes"
+episode_dir = EPISODE_DIR
+
 obses, samples = create_dataset_from_json(episode_dir)
 print("obses:", len(obses), "samples:", len(samples))
 
@@ -275,16 +257,11 @@ class LuxDataset(Dataset):
         return len(self.samples)
 
     def __getitem__(self, idx):
-        obs_id, action_map, direction = self.samples[idx]
+        obs_id, action_map = self.samples[idx]
         obs = self.obses[obs_id]
         state_1, state_2 = make_input(obs)
-        if direction == 0:
-            return state_1, state_2, action_map
-        else:
-            # rotate the state & action map according to the direction(=0,1,2,3)
-            state_1 = np.rot90(state_1, direction, (1, 2)).copy()
-            action_map = np.rot90(action_map, direction, (0, 1)).copy()
-            return state_1, state_2, action_map
+
+        return state_1, state_2, action_map
 
 
 def train_model(model, dataloaders_dict, criterion, optimizer, num_epochs):
@@ -338,7 +315,7 @@ def train_model(model, dataloaders_dict, criterion, optimizer, num_epochs):
             traced = torch.jit.trace(
                 model.cpu(), (torch.rand(1, 14, 32, 32), torch.rand(1, 15, 4, 4))
             )
-            traced.save("model_full_trick_CE.pth")
+            traced.save(f"{MODEL_DIR}/model_all_top_agents_{epoch_acc:.2f}.pth")
             best_acc = epoch_acc
 
 
@@ -360,7 +337,7 @@ optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
 scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.98)
 best_acc = 0.0
 global_epoch = 0
-for n in range(40):
+for n in range(100):
     print("Learnint with lr :", optimizer.state_dict()["param_groups"][0]["lr"])
     train_model(model, dataloaders_dict, criterion, optimizer, num_epochs=1)
     scheduler.step()

@@ -11,7 +11,9 @@ from torch.utils.data import Dataset, DataLoader
 import torch.optim as optim
 from sklearn.model_selection import train_test_split
 
-EPISODE_DIR = "/projectnb/ds598xz/students/xthomas/FINAL/sp2024_RL/full_episodes/top_agents/23692494"
+EPISODE_DIR = (
+    "/projectnb/ds598xz/students/xthomas/FINAL/sp2024_RL/full_episodes/top_agents"
+)
 MODEL_DIR = "/projectnb/ds598xz/students/xthomas/FINAL/sp2024_RL/models/UNet_Attention"
 
 
@@ -73,8 +75,8 @@ def create_dataset_from_json(episode_dir, team_name="Toad Brigade"):
         str(ep) for ep in episodes if "info" not in str(ep) and "output" not in str(ep)
     ]
 
-    episodes = episodes[-1500:]
-    random.shuffle(episodes)
+    # episodes = episodes[-1500:]
+    # random.shuffle(episodes)
 
     for filepath in tqdm(episodes):
         with open(filepath) as f:
@@ -309,7 +311,9 @@ def train_model(model, dataloaders_dict, criterion, optimizer, num_epochs):
             traced = torch.jit.trace(
                 model.cpu(), (torch.rand(1, 14, 32, 32), torch.rand(1, 15, 4, 4))
             )
-            traced.save(f"{MODEL_DIR}/model_23692494.pth")
+            traced.save(
+                f"{MODEL_DIR}/model_all_top_agents_40_epochs_{epoch_acc:.2f}.pth"
+            )
             best_acc = epoch_acc
 
 
@@ -333,7 +337,7 @@ optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
 scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.98)
 best_acc = 0.0
 global_epoch = 0
-for n in range(100):
+for n in range(40):
     print("Learning with lr :", optimizer.state_dict()["param_groups"][0]["lr"])
     train_model(model, dataloaders_dict, criterion, optimizer, num_epochs=1)
     # We set the LR decayed every epoch

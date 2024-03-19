@@ -11,8 +11,13 @@ from torch.utils.data import Dataset, DataLoader
 import torch.optim as optim
 from sklearn.model_selection import train_test_split
 
-EPISODE_DIR = "/projectnb/ds598xz/students/xthomas/FINAL/lux-AI/full_episodes"
+EPISODE_DIR = (
+    "/projectnb/ds598xz/students/xthomas/FINAL/sp2024_RL/full_episodes/top_agents"
+)
 MODEL_DIR = "/projectnb/ds598xz/students/xthomas/FINAL/lux-AI/models/luxnet"
+FINE_TUNE_MODEL = (
+    "/projectnb/ds598xz/students/xthomas/FINAL/sp2024_RL/models/luxnet/top/model.pth"
+)
 
 
 def seed_everything(seed_value):
@@ -55,8 +60,11 @@ def create_dataset_from_json(episode_dir, team_name="Toad Brigade"):
     obses = {}
     samples = []
     append = samples.append
+    # get all .json files under the episode_dir even in subdirectories
+    episodes = list(Path(episode_dir).rglob("*.json"))
+    # clean episode files
     episodes = [
-        path for path in Path(episode_dir).glob("*.json") if "output" not in path.name
+        str(ep) for ep in episodes if "info" not in str(ep) and "output" not in str(ep)
     ]
     for filepath in tqdm(episodes):
         with open(filepath) as f:
@@ -236,13 +244,16 @@ def train_model(model, dataloaders_dict, criterion, optimizer, num_epochs):
 
         if epoch_acc > best_acc:
             traced = torch.jit.trace(model.cpu(), torch.rand(1, 20, 32, 32))
-            traced.save(f"{MODEL_DIR}/model.pth")
+            traced.save(f"{MODEL_DIR}/model_all_luxnet_{epoch_acc}.pth")
             best_acc = epoch_acc
 
 
 from luxnet_model import LuxNet
 
 model = LuxNet()
+
+model = torch.jit.load(FINE_TUNE_MODEL)
+
 train, val = train_test_split(samples, test_size=0.1, random_state=12, stratify=labels)
 batch_size = 64
 train_loader = DataLoader(
@@ -253,7 +264,7 @@ val_loader = DataLoader(
 )
 dataloaders_dict = {"train": train_loader, "val": val_loader}
 criterion = nn.CrossEntropyLoss()
-optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3)
+optimizer = torch.optim.AdamW(model.parameters(), lr=1e-2)
 
 
 # optimizer = torch.optim.AdamW(model.parameters(), lr=1e-2)
